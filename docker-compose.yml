@@ -1,0 +1,31 @@
+services:
+  tractor-db:
+    image: postgres:16
+    container_name: tractor-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: tractor
+      POSTGRES_PASSWORD: tractor
+      POSTGRES_DB: tractor
+    volumes:
+      - tractor-db:/var/lib/postgresql/data
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+      - ./db/csv:/docker-entrypoint-initdb.d/csv
+    command: ["postgres", "-c", "log_statement=all"]
+
+  tractor-backend:
+    build: ./backend
+    container_name: tractor-backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - tractor-db
+    environment:
+      DATABASE_URL: postgres://tractor:tractor@tractor-db:5432/tractor
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+volumes:
+  tractor-db:
