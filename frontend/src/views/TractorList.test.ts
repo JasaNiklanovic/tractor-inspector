@@ -27,7 +27,8 @@ describe('TractorList', () => {
       global: { plugins: [router] }
     })
 
-    expect(wrapper.text()).toContain('Loading fleet data')
+    // Should show skeleton loaders during loading
+    expect(wrapper.findComponent({ name: 'TractorCardSkeleton' }).exists()).toBe(true)
   })
 
   it('displays tractors after loading', async () => {

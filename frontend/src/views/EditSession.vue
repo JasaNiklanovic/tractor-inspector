@@ -2,6 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getSession, updateSession, type TractorSession } from '@/api/tractors'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import ErrorAlert from '@/components/ErrorAlert.vue'
+import Icon from '@/components/Icon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,9 +112,10 @@ async function handleSubmit() {
   try {
     await updateSession(serialNumber.value, sessionId.value, formData.value)
     success.value = true
+    window.scrollTo({ top: 0, behavior: 'smooth' })
     setTimeout(() => {
       router.push({ name: 'tractor-detail', params: { serialNumber: serialNumber.value } })
-    }, 1500)
+    }, 2000)
   } catch (e) {
     error.value = 'Failed to save changes'
     console.error(e)
@@ -123,47 +127,47 @@ async function handleSubmit() {
 const fieldGroups = [
   {
     title: 'Location',
-    icon: 'M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z',
+    icon: 'location',
     fields: [
-      { key: 'gps_longitude', label: 'GPS Longitude', type: 'number', step: '0.000001', unit: '°' },
-      { key: 'gps_latitude', label: 'GPS Latitude', type: 'number', step: '0.000001', unit: '°' }
+      { key: 'gps_longitude', label: 'GPS Longitude', type: 'number', step: 'any', unit: '°' },
+      { key: 'gps_latitude', label: 'GPS Latitude', type: 'number', step: 'any', unit: '°' }
     ]
   },
   {
     title: 'Engine',
-    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+    icon: 'lightning',
     fields: [
-      { key: 'engine_speed', label: 'Engine Speed', type: 'number', step: '1', unit: 'rpm' },
-      { key: 'engine_load', label: 'Engine Load', type: 'number', step: '1', min: 0, max: 100, unit: '%' },
-      { key: 'fuel_consumption', label: 'Fuel Consumption', type: 'number', step: '0.01', unit: 'l/h' },
-      { key: 'coolant_temperature', label: 'Coolant Temperature', type: 'number', step: '1', unit: '°C' }
+      { key: 'engine_speed', label: 'Engine Speed', type: 'number', step: 'any', unit: 'rpm' },
+      { key: 'engine_load', label: 'Engine Load', type: 'number', step: 'any', min: 0, max: 100, unit: '%' },
+      { key: 'fuel_consumption', label: 'Fuel Consumption', type: 'number', step: 'any', unit: 'l/h' },
+      { key: 'coolant_temperature', label: 'Coolant Temperature', type: 'number', step: 'any', unit: '°C' }
     ]
   },
   {
     title: 'Performance',
-    icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+    icon: 'chart',
     fields: [
-      { key: 'total_working_hours_counter', label: 'Total Working Hours', type: 'number', step: '0.01', unit: 'h' },
-      { key: 'ground_speed_gearbox', label: 'Ground Speed (Gearbox)', type: 'number', step: '0.1', unit: 'km/h' },
-      { key: 'ground_speed_radar', label: 'Ground Speed (Radar)', type: 'number', step: '0.1', unit: 'km/h' },
-      { key: 'ambient_temperature', label: 'Ambient Temperature', type: 'number', step: '0.1', unit: '°C' }
+      { key: 'total_working_hours_counter', label: 'Total Working Hours', type: 'number', step: 'any', unit: 'h' },
+      { key: 'ground_speed_gearbox', label: 'Ground Speed (Gearbox)', type: 'number', step: 'any', unit: 'km/h' },
+      { key: 'ground_speed_radar', label: 'Ground Speed (Radar)', type: 'number', step: 'any', unit: 'km/h' },
+      { key: 'ambient_temperature', label: 'Ambient Temperature', type: 'number', step: 'any', unit: '°C' }
     ]
   },
   {
     title: 'Power Take-Off',
-    icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    icon: 'cog',
     fields: [
-      { key: 'speed_front_pto', label: 'Front PTO Speed', type: 'number', step: '1', unit: 'rpm' },
-      { key: 'speed_rear_pto', label: 'Rear PTO Speed', type: 'number', step: '1', unit: 'rpm' },
-      { key: 'current_gear_shift', label: 'Current Gear', type: 'number', step: '1', unit: '' }
+      { key: 'speed_front_pto', label: 'Front PTO Speed', type: 'number', step: 'any', unit: 'rpm' },
+      { key: 'speed_rear_pto', label: 'Rear PTO Speed', type: 'number', step: 'any', unit: 'rpm' },
+      { key: 'current_gear_shift', label: 'Current Gear', type: 'number', step: 'any', unit: '' }
     ]
   },
   {
     title: 'Status',
-    icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    icon: 'check-circle',
     fields: [
-      { key: 'parking_brake_status', label: 'Parking Brake', type: 'number', step: '1', min: 0, max: 1, unit: '' },
-      { key: 'transverse_differential_lock_status', label: 'Differential Lock', type: 'number', step: '1', min: 0, max: 1, unit: '' },
+      { key: 'parking_brake_status', label: 'Parking Brake', type: 'number', step: 'any', min: 0, max: 1, unit: '' },
+      { key: 'transverse_differential_lock_status', label: 'Differential Lock', type: 'number', step: 'any', min: 0, max: 1, unit: '' },
       { key: 'all_wheel_drive_status', label: 'All-Wheel Drive', type: 'text', unit: '' },
       { key: 'actual_status_of_creeper', label: 'Creeper Status', type: 'text', unit: '' }
     ]
@@ -183,9 +187,7 @@ onMounted(fetchSession)
             :to="{ name: 'tractor-detail', params: { serialNumber } }"
             class="btn-ghost !p-2 rounded-lg"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
+            <Icon name="arrow-left" />
           </RouterLink>
           <div>
             <p class="text-overline mb-0.5">Edit Session</p>
@@ -199,29 +201,22 @@ onMounted(fetchSession)
     <!-- Main Content -->
     <main class="container-app py-8">
       <!-- Loading State -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-24">
-        <div class="loader mb-4"></div>
-        <p class="text-caption">Loading session data...</p>
-      </div>
+      <LoadingSpinner v-if="loading" message="Loading session data..." />
 
       <!-- Error State (no session) -->
-      <div v-else-if="error && !session" class="alert alert-error max-w-md mx-auto">
-        <div class="flex items-center gap-3">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          {{ error }}
-        </div>
-      </div>
+      <ErrorAlert
+        v-else-if="error && !session"
+        :message="error"
+        :show-retry="true"
+        @retry="fetchSession"
+      />
 
       <!-- Form -->
       <form v-else-if="session" @submit.prevent="handleSubmit" class="max-w-5xl mx-auto">
         <!-- Success Message -->
         <div v-if="success" class="alert alert-success mb-6 fade-in">
           <div class="flex items-center gap-3">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <Icon name="check-circle" class="flex-shrink-0" />
             Changes saved successfully! Redirecting...
           </div>
         </div>
@@ -229,9 +224,7 @@ onMounted(fetchSession)
         <!-- Error Message -->
         <div v-if="error" class="alert alert-error mb-6">
           <div class="flex items-center gap-3">
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <Icon name="exclamation-circle" class="flex-shrink-0" />
             {{ error }}
           </div>
         </div>
@@ -245,9 +238,7 @@ onMounted(fetchSession)
           >
             <div class="flex items-center gap-3 mb-6">
               <div class="w-10 h-10 rounded-lg bg-[var(--color-cream)] flex items-center justify-center">
-                <svg class="w-5 h-5 text-[var(--color-forest-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" :d="group.icon"/>
-                </svg>
+                <Icon :name="group.icon" class="text-[var(--color-forest-muted)]" />
               </div>
               <h2 class="heading-3">{{ group.title }}</h2>
             </div>
@@ -307,9 +298,7 @@ onMounted(fetchSession)
               Saving...
             </template>
             <template v-else>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-              </svg>
+              <Icon name="check" size="sm" />
               Save Changes
             </template>
           </button>

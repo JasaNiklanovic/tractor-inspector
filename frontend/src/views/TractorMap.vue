@@ -3,6 +3,9 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import { getGPSData, type GPSData } from '@/api/tractors'
 import L from 'leaflet'
+import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import ErrorAlert from '@/components/ErrorAlert.vue'
+import Icon from '@/components/Icon.vue'
 
 const route = useRoute()
 const serialNumber = computed(() => route.params.serialNumber as string)
@@ -14,7 +17,8 @@ const error = ref<string | null>(null)
 const mapContainer = ref<HTMLDivElement | null>(null)
 let map: L.Map | null = null
 let tractorMarker: L.Marker | null = null
-let pathLine: L.Polyline | null = null
+let pathLines: L.Polyline[] = []
+const showLegend = ref(true)
 
 // Timeline state
 const currentIndex = ref(0)
@@ -86,6 +90,22 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * c
 }
 
+// Get color based on speed (km/h)
+function getSpeedColor(speed: number | null | undefined): string {
+  if (speed === null || speed === undefined) return '#9ca3af' // gray for unknown
+  if (speed < 5) return '#10b981' // green for slow/stationary
+  if (speed < 15) return '#f59e0b' // amber for medium
+  return '#ef4444' // red for fast
+}
+
+// Speed legend data
+const speedLegend = [
+  { color: '#10b981', label: '< 5 km/h', description: 'Stationary/Slow' },
+  { color: '#f59e0b', label: '5-15 km/h', description: 'Medium' },
+  { color: '#ef4444', label: '> 15 km/h', description: 'Fast' },
+  { color: '#9ca3af', label: 'Unknown', description: 'No speed data' }
+]
+
 async function fetchData() {
   loading.value = true
   error.value = null
@@ -145,18 +165,45 @@ function initMap() {
     maxZoom: 20
   }).addTo(map)
 
-  const pathCoords: L.LatLngExpression[] = gpsData.value.map(d => [d.gps_latitude, d.gps_longitude])
+  // Create color-coded path segments based on speed
+  const allCoords: L.LatLngExpression[] = []
+  for (let i = 0; i < gpsData.value.length - 1; i++) {
+    const current = gpsData.value[i]
+    const next = gpsData.value[i + 1]
 
-  // Draw path with gradient effect
-  pathLine = L.polyline(pathCoords, {
-    color: '#2d5a42',
-    weight: 4,
-    opacity: 0.8,
-    lineCap: 'round',
-    lineJoin: 'round'
-  }).addTo(map)
+    const segmentCoords: L.LatLngExpression[] = [
+      [current.gps_latitude, current.gps_longitude],
+      [next.gps_latitude, next.gps_longitude]
+    ]
 
-  map.fitBounds(pathLine.getBounds(), { padding: [60, 60] })
+    allCoords.push([current.gps_latitude, current.gps_longitude])
+
+    // Use average speed of the two points for segment color
+    const avgSpeed = ((current.ground_speed_gearbox || 0) + (next.ground_speed_gearbox || 0)) / 2
+    const color = getSpeedColor(avgSpeed)
+
+    const segment = L.polyline(segmentCoords, {
+      color: color,
+      weight: 4,
+      opacity: 0.8,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map)
+
+    pathLines.push(segment)
+  }
+
+  // Add last point to coords for bounds calculation
+  if (gpsData.value.length > 0) {
+    const last = gpsData.value[gpsData.value.length - 1]
+    allCoords.push([last.gps_latitude, last.gps_longitude])
+  }
+
+  // Fit map to show all coordinates
+  if (allCoords.length > 0) {
+    const bounds = L.latLngBounds(allCoords)
+    map.fitBounds(bounds, { padding: [60, 60] })
+  }
 
   const firstPos = gpsData.value[0]
   tractorMarker = L.marker([firstPos.gps_latitude, firstPos.gps_longitude], {
@@ -276,9 +323,7 @@ watch(currentIndex, updateMarkerPosition)
               :to="{ name: 'tractor-detail', params: { serialNumber } }"
               class="btn-ghost !p-2 rounded-lg"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-              </svg>
+              <Icon name="arrow-left" />
             </RouterLink>
             <div>
               <p class="text-overline mb-0.5">Movement Map</p>
@@ -295,31 +340,23 @@ watch(currentIndex, updateMarkerPosition)
 
     <!-- Loading State -->
     <div v-if="loading" class="flex-1 flex items-center justify-center">
-      <div class="text-center">
-        <div class="loader mb-4"></div>
-        <p class="text-caption">Loading GPS data...</p>
-      </div>
+      <LoadingSpinner message="Loading GPS data..." />
     </div>
 
-    <!-- Error State -->
+    <!-- Error State with Retry -->
     <div v-else-if="error" class="flex-1 flex items-center justify-center p-6">
-      <div class="alert alert-error max-w-md">
-        <div class="flex items-center gap-3">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          {{ error }}
-        </div>
-      </div>
+      <ErrorAlert
+        :message="error"
+        :show-retry="true"
+        @retry="fetchData"
+      />
     </div>
 
     <!-- No Data State -->
     <div v-else-if="gpsData.length === 0" class="flex-1 flex items-center justify-center p-6">
       <div class="text-center">
         <div class="w-16 h-16 rounded-full bg-[var(--color-cream)] flex items-center justify-center mx-auto mb-4">
-          <svg class="w-8 h-8 text-[var(--color-text-subtle)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-          </svg>
+          <Icon name="map" size="xl" class="text-[var(--color-text-subtle)]" />
         </div>
         <p class="text-[var(--color-text-muted)]">No GPS data available for this tractor.</p>
       </div>
@@ -328,7 +365,49 @@ watch(currentIndex, updateMarkerPosition)
     <!-- Map & Controls -->
     <template v-else>
       <!-- Map Container -->
-      <div ref="mapContainer" class="flex-1 z-0"></div>
+      <div class="flex-1 relative">
+        <div ref="mapContainer" class="absolute inset-0 z-0"></div>
+
+        <!-- Speed Legend -->
+        <div v-if="showLegend" class="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-4 max-w-[200px]">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-[var(--color-forest)]">Speed Legend</h3>
+            <button
+              @click="showLegend = false"
+              class="text-[var(--color-text-subtle)] hover:text-[var(--color-text)] transition-colors"
+              title="Hide legend"
+            >
+              <Icon name="x" size="sm" />
+            </button>
+          </div>
+          <div class="space-y-2">
+            <div
+              v-for="item in speedLegend"
+              :key="item.label"
+              class="flex items-center gap-2"
+            >
+              <div
+                class="w-8 h-1 rounded-full"
+                :style="{ backgroundColor: item.color }"
+              ></div>
+              <div class="flex-1">
+                <p class="text-xs font-medium text-[var(--color-text)]">{{ item.label }}</p>
+                <p class="text-[10px] text-[var(--color-text-subtle)]">{{ item.description }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toggle Legend Button (when hidden) -->
+        <button
+          v-else
+          @click="showLegend = true"
+          class="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 text-sm font-medium text-[var(--color-forest)] hover:bg-white transition-colors"
+          title="Show legend"
+        >
+          <Icon name="info-circle" />
+        </button>
+      </div>
 
       <!-- Timeline Controls -->
       <div class="bg-[var(--color-surface-elevated)] border-t border-[var(--color-border)] shadow-lg">
@@ -337,9 +416,7 @@ watch(currentIndex, updateMarkerPosition)
           <div v-if="currentPosition" class="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
             <div class="flex items-center gap-2 min-w-[200px]">
               <div class="w-8 h-8 rounded-lg bg-[var(--color-cream)] flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-[var(--color-forest-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+                <Icon name="clock" size="sm" class="text-[var(--color-forest-muted)]" />
               </div>
               <div>
                 <p class="text-xs text-[var(--color-text-subtle)]">Time</p>
@@ -349,9 +426,7 @@ watch(currentIndex, updateMarkerPosition)
 
             <div class="flex items-center gap-2 min-w-[120px]">
               <div class="w-8 h-8 rounded-lg bg-[var(--color-cream)] flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-[var(--color-forest-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                </svg>
+                <Icon name="lightning" size="sm" class="text-[var(--color-forest-muted)]" />
               </div>
               <div>
                 <p class="text-xs text-[var(--color-text-subtle)]">Speed</p>
@@ -363,9 +438,7 @@ watch(currentIndex, updateMarkerPosition)
 
             <div class="flex items-center gap-2 min-w-[110px]">
               <div class="w-8 h-8 rounded-lg bg-[var(--color-cream)] flex items-center justify-center flex-shrink-0">
-                <svg class="w-4 h-4 text-[var(--color-forest-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                </svg>
+                <Icon name="cog" size="sm" class="text-[var(--color-forest-muted)]" />
               </div>
               <div>
                 <p class="text-xs text-[var(--color-text-subtle)]">Engine</p>
@@ -392,9 +465,7 @@ watch(currentIndex, updateMarkerPosition)
                 class="btn-ghost !p-2 rounded-lg"
                 title="Reset to start"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
+                <Icon name="refresh" />
               </button>
 
               <button
@@ -402,21 +473,15 @@ watch(currentIndex, updateMarkerPosition)
                 class="btn-ghost !p-2 rounded-lg"
                 title="Skip back 10%"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
-                </svg>
+                <Icon name="skip-back" />
               </button>
 
               <button
                 @click="isPlaying ? pause() : play()"
                 class="w-12 h-12 rounded-full bg-[var(--color-forest)] text-white flex items-center justify-center hover:bg-[var(--color-forest-light)] transition-colors shadow-md"
               >
-                <svg v-if="!isPlaying" class="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z"/>
-                </svg>
-                <svg v-else class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                </svg>
+                <Icon v-if="!isPlaying" name="play" size="lg" filled class="ml-0.5" />
+                <Icon v-else name="pause" size="lg" filled />
               </button>
 
               <button
@@ -424,9 +489,7 @@ watch(currentIndex, updateMarkerPosition)
                 class="btn-ghost !p-2 rounded-lg"
                 title="Skip forward 10%"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z"/>
-                </svg>
+                <Icon name="skip-forward" />
               </button>
 
               <!-- Speed Control -->

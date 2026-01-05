@@ -2,12 +2,17 @@
 import { ref, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getTractors, type Tractor } from '@/api/tractors'
+import ErrorAlert from '@/components/ErrorAlert.vue'
+import TractorCardSkeleton from '@/components/TractorCardSkeleton.vue'
+import Icon from '@/components/Icon.vue'
 
 const tractors = ref<Tractor[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-onMounted(async () => {
+async function fetchTractors() {
+  loading.value = true
+  error.value = null
   try {
     tractors.value = await getTractors()
   } catch (e) {
@@ -16,11 +21,18 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(fetchTractors)
 
 function formatHours(hours: number | null | undefined): string {
   if (hours === null || hours === undefined) return 'N/A'
   return hours.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+}
+
+function getTractorImage(index: number): string {
+  const imageNumber = (index % 3) + 1
+  return `/images/tractor${imageNumber}.jpg`
 }
 </script>
 
@@ -83,21 +95,18 @@ function formatHours(hours: number | null | undefined): string {
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-24">
-        <div class="loader mb-4"></div>
-        <p class="text-caption">Loading fleet data...</p>
+      <!-- Loading State with Skeletons -->
+      <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+        <TractorCardSkeleton v-for="i in 3" :key="i" />
       </div>
 
-      <!-- Error State -->
-      <div v-else-if="error" class="alert alert-error max-w-md mx-auto">
-        <div class="flex items-center gap-3">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          {{ error }}
-        </div>
-      </div>
+      <!-- Error State with Retry -->
+      <ErrorAlert
+        v-else-if="error"
+        :message="error"
+        :show-retry="true"
+        @retry="fetchTractors"
+      />
 
       <!-- Tractor Grid -->
       <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -109,24 +118,21 @@ function formatHours(hours: number | null | undefined): string {
           :style="{ animationDelay: `${index * 100}ms` }"
         >
           <!-- Card Image Area -->
-          <div class="relative h-52 hero-gradient overflow-hidden">
-            <!-- Tractor Icon -->
-            <div class="absolute inset-0 flex items-center justify-center">
-              <svg class="w-28 h-28 text-white/30 group-hover:text-white/50 transition-colors duration-300 group-hover:scale-110 transform" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 17h1c.55 0 1-.45 1-1v-2c0-1.1-.9-2-2-2h-1l-1.18-3.18A2.01 2.01 0 0 0 15 7h-2V6c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v7c0 1.1.9 2 2 2h1c0 1.66 1.34 3 3 3s3-1.34 3-3h3c0 1.66 1.34 3 3 3s3-1.34 3-3c0-.35-.06-.68-.17-1H19zM10 17c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm9 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
-              </svg>
-            </div>
+          <div class="relative h-52 overflow-hidden">
+            <!-- Tractor Photo -->
+            <img
+              :src="getTractorImage(index)"
+              :alt="`Tractor ${tractor.serial_number}`"
+              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
 
-            <!-- Decorative Lines -->
-            <div class="absolute inset-0 opacity-10">
-              <div class="absolute top-4 left-4 right-4 h-px bg-white"></div>
-              <div class="absolute bottom-4 left-4 right-4 h-px bg-white"></div>
-            </div>
+            <!-- Gradient Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
 
             <!-- Status Badge -->
             <div class="absolute top-4 right-4">
-              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/20 text-white backdrop-blur-sm">
-                <span class="w-1.5 h-1.5 bg-[var(--color-amber)] rounded-full"></span>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/90 text-[var(--color-forest)] backdrop-blur-sm shadow-md">
+                <span class="w-1.5 h-1.5 bg-[var(--color-success)] rounded-full animate-pulse"></span>
                 Active
               </span>
             </div>
@@ -142,9 +148,7 @@ function formatHours(hours: number | null | undefined): string {
                 </h3>
               </div>
               <div class="w-10 h-10 rounded-full bg-[var(--color-cream)] flex items-center justify-center group-hover:bg-[var(--color-amber)] group-hover:text-[var(--color-forest)] transition-all">
-                <svg class="w-5 h-5 transform group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                </svg>
+                <Icon name="arrow-right" class="transform group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
 
@@ -153,9 +157,7 @@ function formatHours(hours: number | null | undefined): string {
             <!-- Metrics -->
             <div class="flex items-center gap-3">
               <div class="w-10 h-10 rounded-lg bg-[var(--color-cream)] flex items-center justify-center">
-                <svg class="w-5 h-5 text-[var(--color-forest-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
+                <Icon name="clock" class="text-[var(--color-forest-muted)]" />
               </div>
               <div>
                 <p class="text-xs text-[var(--color-text-subtle)] mb-0.5">Total Working Hours</p>

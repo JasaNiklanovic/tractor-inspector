@@ -2,6 +2,9 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { getTractorData, type PaginatedResponse } from '@/api/tractors'
+import ErrorAlert from '@/components/ErrorAlert.vue'
+import TableSkeleton from '@/components/TableSkeleton.vue'
+import Icon from '@/components/Icon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -118,9 +121,7 @@ watch([() => route.query], fetchData)
               to="/"
               class="btn-ghost !p-2 rounded-lg"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-              </svg>
+              <Icon name="arrow-left" />
             </RouterLink>
             <div>
               <p class="text-overline mb-0.5">Tractor Telemetry</p>
@@ -133,9 +134,7 @@ watch([() => route.query], fetchData)
               :to="{ name: 'tractor-map', params: { serialNumber } }"
               class="btn-accent"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-              </svg>
+              <Icon name="map" size="sm" />
               View Movement Map
             </RouterLink>
           </div>
@@ -145,21 +144,22 @@ watch([() => route.query], fetchData)
 
     <!-- Main Content -->
     <main class="container-app py-8">
-      <!-- Loading State -->
-      <div v-if="loading" class="flex flex-col items-center justify-center py-24">
-        <div class="loader mb-4"></div>
-        <p class="text-caption">Loading telemetry data...</p>
+      <!-- Loading State with Skeleton -->
+      <div v-if="loading">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div class="h-5 bg-gray-200 rounded w-48 animate-pulse"></div>
+          <div class="h-10 bg-gray-200 rounded w-32 animate-pulse"></div>
+        </div>
+        <TableSkeleton :rows="10" :columns="8" />
       </div>
 
-      <!-- Error State -->
-      <div v-else-if="error" class="alert alert-error max-w-md mx-auto">
-        <div class="flex items-center gap-3">
-          <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          {{ error }}
-        </div>
-      </div>
+      <!-- Error State with Retry -->
+      <ErrorAlert
+        v-else-if="error"
+        :message="error"
+        :show-retry="true"
+        @retry="fetchData"
+      />
 
       <template v-else-if="data">
         <!-- Controls Bar -->
@@ -253,9 +253,7 @@ watch([() => route.query], fetchData)
               class="pagination-btn"
               title="First page"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
-              </svg>
+              <Icon name="chevron-double-left" size="sm" />
             </button>
             <button
               @click="page = page - 1"
@@ -263,9 +261,7 @@ watch([() => route.query], fetchData)
               class="pagination-btn"
               title="Previous page"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-              </svg>
+              <Icon name="arrow-left" size="sm" />
             </button>
           </div>
 
@@ -289,9 +285,7 @@ watch([() => route.query], fetchData)
               class="pagination-btn"
               title="Next page"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-              </svg>
+              <Icon name="arrow-right" size="sm" />
             </button>
             <button
               @click="page = data.totalPages"
@@ -299,9 +293,7 @@ watch([() => route.query], fetchData)
               class="pagination-btn"
               title="Last page"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
-              </svg>
+              <Icon name="chevron-double-right" size="sm" />
             </button>
           </div>
         </div>

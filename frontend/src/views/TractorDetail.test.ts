@@ -84,7 +84,8 @@ describe('TractorDetail', () => {
       global: { plugins: [router] }
     })
 
-    expect(wrapper.text()).toContain('Loading telemetry data')
+    // Should show skeleton loader during loading
+    expect(wrapper.findComponent({ name: 'TableSkeleton' }).exists()).toBe(true)
   })
 
   it('displays tractor serial number in header', async () => {
