@@ -2,6 +2,12 @@
 
 A modern fleet management dashboard for monitoring agricultural machinery telemetry data. Built with Vue 3, TypeScript, Express.js, and PostgreSQL.
 
+## Demo
+
+https://github.com/JasaNiklanovic/tractor-inspector/raw/main/Recording.mov
+
+*Preview of the full user experience: fleet overview, telemetry data browsing, session editing, and interactive movement map with timeline playback.*
+
 ## Features
 
 - **Fleet Overview**: View all tractors with their total working hours at a glance
